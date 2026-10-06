@@ -1,0 +1,36 @@
+name: Pull validated encrypted pricing output
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: encrypted-public-output
+  cancel-in-progress: false
+jobs:
+  pull:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: automation
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install requests==2.34.2 olefile==0.47
+      - name: Future read-only private Actions App token
+        id: app
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.PRICING_READ_APP_ID }}
+          private-key: ${{ secrets.PRICING_READ_APP_PRIVATE_KEY }}
+          owner: poolzonecz
+          repositories: poolzone-pricing
+          permission-actions: read
+      - name: Pull, validate and atomically update own output branch
+        env:
+          PRIVATE_ACTIONS_READ_TOKEN: ${{ steps.app.outputs.token }}
+          PUBLIC_GITHUB_TOKEN: ${{ github.token }}
+          APPROVED_PRICING_SHA: 52bab680c25b25137f33da2d42ff94413f766320
+        run: python -B pull_output.py
